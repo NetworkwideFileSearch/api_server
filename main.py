@@ -1,4 +1,6 @@
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+import os
 import nmap
 import socket
 from sqlalchemy.orm import Session
@@ -45,7 +47,6 @@ app = FastAPI()
 
 # /search - search query for the file name
 # /rediscover - again check for devices in the network
-# /download - download file from the device
 
 
 @app.get("/search")
@@ -59,6 +60,17 @@ async def rediscover():
     hosts = get_all_ips()
     nw_hosts = hosts
     return {"hosts": hosts}
+
+
+@app.get("/file")
+async def read_file(location: str):
+    filename = os.path.basename(location)
+    file_path = os.path.abspath(location)
+    file_like = open(file_path, mode="rb")
+    headers = {
+        "Content-Disposition": f"attachment; filename={filename}"
+    }
+    return StreamingResponse(file_like, headers=headers, media_type="application/octet-stream")
 
 
 # Testing below
