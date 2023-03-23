@@ -1,6 +1,12 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 import nmap
 import socket
+from sqlalchemy.orm import Session
+
+from models import File, Base
+from database import SessionLocal, engine
+
+Base.metadata.create_all(bind=engine)
 
 # Find ip address of the current machine
 hostname = socket.gethostname()
@@ -12,6 +18,16 @@ nm = nmap.PortScanner(nmap_search_path=s_path)
 
 # cache all hosts list
 nw_hosts = []
+
+# Dependency
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Utitlity functions
 
@@ -33,8 +49,9 @@ app = FastAPI()
 
 
 @app.get("/search")
-async def search(query: str):
-    return {"query": query}
+async def search(query: str, db: Session = Depends(get_db)):
+    files = db.query(File).all()
+    return files
 
 
 @app.get("/rediscover")
