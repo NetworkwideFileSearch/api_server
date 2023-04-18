@@ -1,7 +1,7 @@
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 import os
-import nmap
+# import nmap
 import socket
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,36 @@ import uvicorn
 from dataclasses import dataclass
 from typing import List
 
+import concurrent.futures
+import requests
+
+from scapy.all import ARP, Ether, srp
+
+
+def scan_network(ip, mask):
+    # Generate the network CIDR notation from the IP address and subnet mask
+    cidr = ip + '/' + mask
+
+    # Create an ARP request packet to send to the network
+    arp_request = ARP(pdst=cidr)
+
+    # Create an Ether packet to encapsulate the ARP request
+    ether_request = Ether(dst='ff:ff:ff:ff:ff:ff')
+
+    # Combine the ARP request and Ether packet into a single packet
+    packet = ether_request/arp_request
+
+    # Use the srp function in scapy to send and receive packets on the network
+    result = srp(packet, timeout=3, verbose=False)[0]
+
+    # Extract the IP and MAC addresses from the responses
+    active_ips = set()
+    for sent, received in result:
+        active_ips.add(received.psrc)
+
+    return active_ips
+
+
 Base.metadata.create_all(bind=engine)
 
 # Find ip address of the current machine
@@ -24,8 +54,8 @@ hostname = socket.gethostname()
 ip_address = socket.gethostbyname(hostname)
 
 # Initialize nmap with path to binary
-s_path = [r'.\Nmap\nmap.exe']
-nm = nmap.PortScanner(nmap_search_path=s_path)
+# s_path = [r'.\Nmap\nmap.exe']
+# nm = nmap.PortScanner(nmap_search_path=s_path)
 
 # cache all hosts list
 nw_hosts = []
@@ -44,12 +74,14 @@ def get_db():
 
 
 def get_all_ips():
-    ip = ip_address.split('.')
-    ip[-1] = '0'
-    ipAddr = '.'.join(ip)
-    nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
-    res = {}
-    return nm.all_hosts()
+    # ip = ip_address.split('.')
+    # ip[-1] = '0'
+    # ipAddr = '.'.join(ip)
+    # nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
+    # res = {}
+    # return nm.all_hosts()
+    hosts = scan_network(ip_address, "24")
+    return hosts
 
 
 @dataclass
@@ -114,7 +146,7 @@ async def startup_event():
 
 
 @app.get("/search/{query}")
-async def search_func(query: str):
+async def search_func(query: str, db: Session = Depends(get_db)):
     """
     Perform a search operation based on the given query.
 
@@ -136,7 +168,63 @@ async def search_func(query: str):
     lis = list(next(res))
     # res = essentials.db_obj.keyword_search(
     #     query, table_name="files", column_name="filename")
-    return lis
+    files = db.query(File).filter(File.id.in_(lis)).all()
+    files.sort(key=lambda row: lis.index(row.id))
+
+    api_output_dict = {}
+
+    api_output_dict[ip_address] = files
+
+    # Define a function to make the API call and store the output in the dictionary
+    def make_api_call(ip):
+        # Replace "api" with the actual API endpoint
+        url = f"http://{ip}:6969/fwd_search/{query}"
+        print("url", url)
+        try:
+            response = requests.get(url)
+            api_output_dict[ip] = response.json()
+        except:
+            api_output_dict[ip] = []
+
+    # Use a ThreadPoolExecutor to make API calls in parallel
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # Submit each API call to the executor
+        print(nw_hosts)
+        futures = [executor.submit(make_api_call, ip) for ip in nw_hosts]
+
+        # Wait for all API calls to complete
+        concurrent.futures.wait(futures)
+
+    # Return the API output dictionary
+    return api_output_dict
+
+
+@app.get("/fwd_search/{query}")
+async def search_func(query: str, db: Session = Depends(get_db)):
+    """
+    Perform a search operation based on the given query.
+
+    Parameters:
+    -----------
+    query: str
+        The query string to search for.
+
+    Returns:
+    --------
+    list
+        A list of file ids in decreasing order of relevance
+    """
+    res = essentials.search_obj.get_top_k_docs(query,
+                                               fetch_func=essentials.db_obj.fetch_id_and_vector,
+                                               k=10,
+                                               similarity_func=cosine_sim,
+                                               encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+    lis = list(next(res))
+    # res = essentials.db_obj.keyword_search(
+    #     query, table_name="files", column_name="filename")
+    files = db.query(File).filter(File.id.in_(lis)).all()
+    files.sort(key=lambda row: lis.index(row.id))
+    return files
 
 
 @app.get("/delete/{file_id}")
@@ -163,7 +251,10 @@ async def add_vector(id_list: int):
 @app.get("/rediscover")
 async def rediscover():
     hosts = get_all_ips()
-    nw_hosts = hosts
+    nw_hosts.clear()
+    for ip in hosts:
+        if ip != ip_address:
+            nw_hosts.append(ip)
     return {"hosts": hosts}
 
 

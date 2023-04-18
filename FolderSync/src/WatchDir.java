@@ -3,6 +3,8 @@ import static java.nio.file.StandardWatchEventKinds.*;
 import static java.nio.file.LinkOption.*;
 import java.nio.file.attribute.*;
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
 
 import java.sql.Connection;
@@ -119,8 +121,8 @@ public class WatchDir {
                 if (event.kind() == ENTRY_CREATE) {
                     try {
 
-                        addFileToDB(child);
-
+                        int inserted_id = addFileToDB(child);
+                        addVectorToDB(inserted_id);
                     } catch (Exception e) {
                         // TODO Auto-generated catch block
                         e.printStackTrace();
@@ -160,7 +162,30 @@ public class WatchDir {
         }
     }
 
-    static void addFileToDB(Path child) throws IOException, SQLException {
+    static void addVectorToDB(int myInteger) {
+        try {
+            URL url = new URL("http://localhost:6969/add_vector/" + myInteger);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            reader.close();
+
+            System.out.println(response.toString());
+            conn.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static int addFileToDB(Path child) throws IOException, SQLException {
 
         BasicFileAttributes attr = Files.readAttributes(child, BasicFileAttributes.class);
         String fileType = Files.probeContentType(child);
@@ -180,7 +205,7 @@ public class WatchDir {
         // System.out.println("--------------------------------------------------");
         connection = DriverManager.getConnection("jdbc:sqlite:sample.db");
         String sql = "INSERT INTO files (location, is_directory, type, created_at, filename, size) VALUES (?,?,?,?,?,?)";
-        PreparedStatement stmt = connection.prepareStatement(sql);
+        PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
         stmt.setString(1, child.toString());
         stmt.setBoolean(2, attr.isDirectory());
         stmt.setString(3, fileType);
@@ -190,6 +215,14 @@ public class WatchDir {
 
         stmt.executeUpdate();
         stmt.close();
+
+        ResultSet generatedKeys = stmt.getGeneratedKeys();
+        if (generatedKeys.next()) {
+            int id = generatedKeys.getInt(1);
+            return id;
+        } else {
+            throw new SQLException("Inserting row failed, no ID obtained.");
+        }
     }
 
     static void deleteFileFromDB(Path path) throws SQLException {
