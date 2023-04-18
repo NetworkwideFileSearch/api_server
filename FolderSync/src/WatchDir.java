@@ -194,6 +194,9 @@ public class WatchDir {
 
     static void deleteFileFromDB(Path path) throws SQLException {
         connection = DriverManager.getConnection("jdbc:sqlite:sample.db");
+        Statement stmte = connection.createStatement();
+        stmte.execute(
+                "PRAGMA foreign_keys=ON");
         String sql = "DELETE FROM files WHERE location=?";
         PreparedStatement stmt = connection.prepareStatement(sql);
         stmt.setString(1, path.toString());
@@ -255,7 +258,11 @@ public class WatchDir {
             statement.executeUpdate(
                     "DROP TABLE IF EXISTS files");
             statement.executeUpdate(
+                    "DROP TABLE IF EXISTS embeddings");
+            statement.executeUpdate(
                     "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY AUTOINCREMENT, location STRING, is_directory INTEGER, type STRING, `created_at` TEXT, `filename` TEXT, `size` INTEGER )");
+            statement.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS embeddings (file_id INTEGER,vectors TEXT,FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE)");
         } catch (SQLException e) {
             // if the error message is "out of memory",
             // it probably means no database file is found
@@ -275,7 +282,7 @@ public class WatchDir {
         // }
 
         // register directory and process its events
-        Path dir = Paths.get("D:\\filesearch1.0.0\\FolderSync\\bin\\test");
+        Path dir = Paths.get("D:\\Downloads\\Video\\Dune (2021) [720p] [WEBRip] [YTS.MX]");
         scanDirectory(dir);
         new WatchDir(dir, recursive).processEvents();
     }
