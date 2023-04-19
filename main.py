@@ -1,7 +1,8 @@
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import os
-# import nmap
+import nmap
 import socket
 from sqlalchemy.orm import Session
 
@@ -54,8 +55,8 @@ hostname = socket.gethostname()
 ip_address = socket.gethostbyname(hostname)
 
 # Initialize nmap with path to binary
-# s_path = [r'.\Nmap\nmap.exe']
-# nm = nmap.PortScanner(nmap_search_path=s_path)
+s_path = [r'.\Nmap\nmap.exe']
+nm = nmap.PortScanner(nmap_search_path=s_path)
 
 # cache all hosts list
 nw_hosts = []
@@ -74,14 +75,14 @@ def get_db():
 
 
 def get_all_ips():
-    # ip = ip_address.split('.')
-    # ip[-1] = '0'
-    # ipAddr = '.'.join(ip)
-    # nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
-    # res = {}
-    # return nm.all_hosts()
-    hosts = scan_network(ip_address, "24")
-    return hosts
+    ip = ip_address.split('.')
+    ip[-1] = '0'
+    ipAddr = '.'.join(ip)
+    nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
+    res = {}
+    return nm.all_hosts()
+    # hosts = scan_network(ip_address, "24")
+    # return hosts
 
 
 @dataclass
@@ -107,6 +108,14 @@ essentials = ObjClass()
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # /search - search query for the file name
 # /rediscover - again check for devices in the network
