@@ -299,7 +299,7 @@ async def rediscover():
     nw_hosts.clear()
     for host in hosts:
         if host['ip'] != ip_address:
-            nw_hosts.append(host)
+            nw_hosts.append(host['ip'])
     return {"hosts": hosts}
 
 
