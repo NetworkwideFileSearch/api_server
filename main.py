@@ -177,20 +177,28 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    res = essentials.search_obj.get_top_k_docs(query,
-                                               fetch_func=essentials.db_obj.fetch_id_and_vector,
-                                               k=10,
-                                               similarity_func=cosine_sim,
-                                               encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
-    lis = list(next(res))
-    # res = essentials.db_obj.keyword_search(
-    #     query, table_name="files", column_name="filename")
+    top_k_dict = essentials.search_obj.get_top_k_docs(query,
+                                                      fetch_func=essentials.db_obj.fetch_id_and_vector,
+                                                      k=10,
+                                                      similarity_func=jaccard_sim,
+                                                      encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+    # the top_k variable is already sorted and of format list of dictionaries
+
+    lis = list(top_k_dict.keys())
+
     files = db.query(File).filter(File.id.in_(lis)).all()
     files.sort(key=lambda row: lis.index(row.id))
 
     api_output_dict = {}
 
-    api_output_dict[ip_address] = files
+    mod_files = []
+
+    for file in files:
+        file_dict = file.__dict__
+        file_dict["score"] = top_k_dict[file.id]
+        mod_files.append(file_dict)
+
+    api_output_dict[ip_address] = mod_files
 
     # Define a function to make the API call and store the output in the dictionary
     def make_api_call(ip):
@@ -231,38 +239,56 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    res = essentials.search_obj.get_top_k_docs(query,
-                                               fetch_func=essentials.db_obj.fetch_id_and_vector,
-                                               k=10,
-                                               similarity_func=cosine_sim,
-                                               encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
-    lis = list(next(res))
-    # res = essentials.db_obj.keyword_search(
-    #     query, table_name="files", column_name="filename")
+    top_k = essentials.search_obj.get_top_k_docs(query,
+                                                 fetch_func=essentials.db_obj.fetch_id_and_vector,
+                                                 k=10,
+                                                 similarity_func=cosine_sim,
+                                                 encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+    # the top_k variable is already sorted and of format list of dictionaries
+
+    lis = list(top_k_dict.keys())
+
     files = db.query(File).filter(File.id.in_(lis)).all()
     files.sort(key=lambda row: lis.index(row.id))
-    return files
+
+    mod_files = []
+
+    for file in files:
+        file_dict = file.__dict__
+        file_dict["score"] = top_k_dict[file.id]
+        mod_files.append(file_dict)
+
+    return mod_files
 
 
-@app.get("/delete/{file_id}")
-def delete_row(file_id: int):
-    op = essentials.db_obj.delete_vector(
-        file_id=int(file_id), table_name="files")
+@app.get("/delete/{file_ids}")
+def delete_row(file_ids: str):
+    # op = essentials.db_obj.delete_vector(
+    #     file_id=int(file_id), table_name="files")
+    file_ids = [int(i) for i in file_ids.split("_")]
+    op = essentials.search_obj.delete_dict(*file_ids)
     if not op:
-        return {'message': f"file data with file_id : {file_id} deleted successfully"}
+        return {'message': f"file data with file_id : {file_ids} deleted successfully"}
     else:
-        return {"message": f"file data with file_id: {file_id} deletion unsuccessful"}
+        return {"message": f"file data  deletion unsuccessful"}
 
 
 @app.get("/add_vector/{id_list}")
 async def add_vector(id_list: int):
+    # file_ids = [int(i) for i in file_ids.split("_")]
     rows = essentials.db_obj.fetch_metadata_of_specific_ids(
         file_ids=[id_list], table_name="files")
 
     data = essentials.db_obj.get_id_vector_pairs_to_add_in_table(
         rows=rows, encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
 
+    data = list(data)
     essentials.db_obj.add_multiple_vectors(data=data, table_name="embeddings")
+    op = essentials.search_obj.add_dict(*data)
+    if not op:
+        return {'message': f"file data and vectors with file_ids : {id_list} added successfully"}
+    else:
+        return {"message": f"file data and vector addition unsuccessful"}
 
 
 @app.get("/rediscover")
