@@ -35,6 +35,32 @@ class search_ops:
         self.doc_encoding_iter = None
         # self.encoding_func = encoding_func
 
+    def convert_to_dict(self,rows):
+        try:
+            dic = {}
+            for id,vec in rows:
+                dic[id]=vec
+            print("fetch_func result convert to dict successful")
+            return dic
+        except:
+            raise KeyError("failure : adding id,vector pairs as dictionary failed")
+        
+    def add_dict(self,*id_vec_pairs):
+        try:
+            for id,vec in id_vec_pairs:
+                self.doc_encoding_iter[id] = vec
+            return "success"
+        except:
+            return False
+            
+
+    def delete_dict(self,*id_list):
+        try:
+            for id in id_list:
+                del self.doc_encoding_iter[id]
+            return "success"
+        except:
+            return False
 
 
     def similarity_score_cal(self,query,fetch_func,similarity_func,encoding_func):
@@ -47,13 +73,12 @@ class search_ops:
         query_embedding = encoding_func(query)
 
         if self.doc_encoding_iter is None:
-            self.doc_encoding_iter = fetch_func()
+            self.doc_encoding_iter = self.convert_to_dict(fetch_func())
     
-        for doc in self.doc_encoding_iter:
-            file_id = doc[0]
-            doc_embedding = doc[1]
-            similarity_score =  similarity_func(query_embedding, doc_embedding)
-            yield (file_id,similarity_score)
+        for id in self.doc_encoding_iter:
+            # file_id = id   # doc_embedding = self.doc_encoding_iter[id]
+            similarity_score =  similarity_func(query_embedding, self.doc_encoding_iter[id])
+            yield (id,similarity_score)
 
 
     def get_top_k_docs(self,query,fetch_func,similarity_func,encoding_func,k = 10 ):

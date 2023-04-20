@@ -236,18 +236,21 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     return files
 
 
-@app.get("/delete/{file_id}")
-def delete_row(file_id: int):
-    op = essentials.db_obj.delete_vector(
-        file_id=int(file_id), table_name="files")
+@app.get("/delete/{file_ids}")
+def delete_row(file_ids: str):
+    # op = essentials.db_obj.delete_vector(
+    #     file_id=int(file_id), table_name="files")
+    file_ids = [int(i) for i in file_ids.split("_")]
+    op = essentials.search_obj.delete_dict(*file_ids)
     if not op:
-        return {'message': f"file data with file_id : {file_id} deleted successfully"}
+        return {'message': f"file data with file_id : {file_ids} deleted successfully"}
     else:
-        return {"message": f"file data with file_id: {file_id} deletion unsuccessful"}
+        return {"message": f"file data  deletion unsuccessful"}
 
 
 @app.get("/add_vector/{id_list}")
-async def add_vector(id_list: int):
+async def add_vector(id_list: str):
+    file_ids = [int(i) for i in file_ids.split("_")]
     rows = essentials.db_obj.fetch_metadata_of_specific_ids(
         file_ids=[id_list], table_name="files")
 
@@ -255,6 +258,12 @@ async def add_vector(id_list: int):
         rows=rows, encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
 
     essentials.db_obj.add_multiple_vectors(data=data, table_name="embeddings")
+
+    op = essentials.search_obj.add_dict(*id_list)
+    if not op:
+        return {'message': f"file data and vectors with file_ids : {id_list} added successfully"}
+    else:
+        return {"message": f"file data and vector addition unsuccessful"}
 
 
 @app.get("/rediscover")
