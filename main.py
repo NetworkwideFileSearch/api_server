@@ -231,11 +231,11 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    top_k = essentials.search_obj.get_top_k_docs(query,
-                                                 fetch_func=essentials.db_obj.fetch_id_and_vector,
-                                                 k=10,
-                                                 similarity_func=cosine_sim,
-                                                 encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+    top_k_dict = essentials.search_obj.get_top_k_docs(query,
+                                                      fetch_func=essentials.db_obj.fetch_id_and_vector,
+                                                      k=10,
+                                                      similarity_func=cosine_sim,
+                                                      encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
     # the top_k variable is already sorted and of format list of dictionaries
 
     lis = list(top_k_dict.keys())
