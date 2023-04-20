@@ -315,7 +315,7 @@ public class WatchDir {
         // }
 
         // register directory and process its events
-        Path dir = Paths.get("D:\\Projects\\BE Project\\api_server\\FolderSync\\bin\\test");
+        Path dir = Paths.get("C:\\Users\\sksou\\OneDrive\\Documents\\BEPRoject\\api_server\\FolderSync\\bin\\test");
         scanDirectory(dir);
         new WatchDir(dir, recursive).processEvents();
     }
