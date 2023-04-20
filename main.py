@@ -80,7 +80,15 @@ def get_all_ips():
     ipAddr = '.'.join(ip)
     nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
     res = {}
-    return nm.all_hosts()
+    hostNames = []
+    for host in nm.all_hosts():
+        info = {'ip':host}
+        if 'hostnames' in nm[host]:
+            info['hostnames'] = nm[host]['hostnames'][0]['name']
+        else:
+            info['hostnames'] = 'Unknown'
+        hostNames.append(info)
+    return hostNames
     # hosts = scan_network(ip_address, "24")
     # return hosts
 
@@ -260,10 +268,12 @@ async def add_vector(id_list: int):
 @app.get("/rediscover")
 async def rediscover():
     hosts = get_all_ips()
+    hostnames = []
+
     nw_hosts.clear()
-    for ip in hosts:
-        if ip != ip_address:
-            nw_hosts.append(ip)
+    for host in hosts:
+        if host['ip'] != ip_address:
+            nw_hosts.append(host)
     return {"hosts": hosts}
 
 
