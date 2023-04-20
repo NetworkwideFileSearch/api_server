@@ -84,8 +84,13 @@ class search_ops:
     def get_top_k_docs(self,query,fetch_func,similarity_func,encoding_func,k = 10 ):
         similarity_scores = self.similarity_score_cal(query,fetch_func=fetch_func,similarity_func=similarity_func,encoding_func= encoding_func)
         sorted_tuples = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
-        for i in range(0,len(sorted_tuples),k):
-            yield [row[0] for row in sorted_tuples[i:i+k]]
+        result_list = []
+        for i in range(k):
+            if i >= len(sorted_tuples):
+                break
+            doc_id, score = sorted_tuples[i]
+            result_list.append({"id": doc_id, "score": score})
+        return result_list
 
 
 # if __name__ == "__main__":

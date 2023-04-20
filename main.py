@@ -169,14 +169,14 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    res = essentials.search_obj.get_top_k_docs(query,
+    top_k = essentials.search_obj.get_top_k_docs(query,
                                                fetch_func=essentials.db_obj.fetch_id_and_vector,
                                                k=10,
-                                               similarity_func=cosine_sim,
+                                               similarity_func= jaccard_sim,
                                                encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
-    lis = list(next(res))
-    # res = essentials.db_obj.keyword_search(
-    #     query, table_name="files", column_name="filename")
+    # the top_k variable is already sorted and of format list of dictionaries 
+
+    
     files = db.query(File).filter(File.id.in_(lis)).all()
     files.sort(key=lambda row: lis.index(row.id))
 
@@ -223,17 +223,14 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    res = essentials.search_obj.get_top_k_docs(query,
+    top_k = essentials.search_obj.get_top_k_docs(query,
                                                fetch_func=essentials.db_obj.fetch_id_and_vector,
                                                k=10,
                                                similarity_func=cosine_sim,
                                                encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
-    lis = list(next(res))
-    # res = essentials.db_obj.keyword_search(
-    #     query, table_name="files", column_name="filename")
-    files = db.query(File).filter(File.id.in_(lis)).all()
-    files.sort(key=lambda row: lis.index(row.id))
-    return files
+    # the top_k variable is already sorted and of format list of dictionaries 
+    return top_k
+ 
 
 
 @app.get("/delete/{file_ids}")
