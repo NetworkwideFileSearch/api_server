@@ -18,45 +18,58 @@ the characteristics of your data and the requirements of your application.
 """
 
 
+import numpy as np
 import faiss
 
-class FaissIndex:
-    def __init__(self, dim, index_type='Flat', metric_type='L2'):
-        self.dim = dim
-        self.index_type = index_type
-        self.metric_type = metric_type
-        self.index = self._create_index()
+class faiss_index:
+    def __init__(self,index_name,dim = 384):
+        self.dim  = dim
+        self.index = self.create_index()
+        self.index_name = index_name
+
+    def create_index(self):
+        return  faiss.IndexIDMap(faiss.IndexFlatIP(self.dim))
+    
+    def normalize(self,vec):
+        return vec/np.linalg.norm(vec)
+
+    def load_index(self):
+        self.index = faiss.read_index(self.index_name)
+
+    def write_index(self):
+        faiss.write_index(self.index,self.index_name)
+
+    def add_multiple_vector(self,vectors,id_list,do_normalize = 1):
+        if do_normalize:
+            vectors= [self.normalize(vec) for vec in vectors]
+         
+        vectors = np.array(vectors)
+        id_list = np.array(id_list)
+        self.index.add_with_ids(vectors,id_list)
+
+    def add_single_vector(self,vector,id,do_normalize = 1):
+        if do_normalize:
+            vector= self.normalize(vector)
+         
+        vector = np.array(vector).reshape(1,self.dim)
+        id_list = np.array([id])
+        self.index.add_with_ids(vector,id_list)
+
+
+    def remove_data(self,id_list):
+        id_list = np.array(id_list)
+        self.index.remove_ids(id_list)
+
+    def search_top_k(self,query_vector,k = 5,do_normalize = 1):
+        if do_normalize:
+            query_vector = self.normalize(query_vector)
+        query_vector = query_vector.reshape(1,self.dim)
+        distance,ids = self.index.search(query_vector ,k = k)
+        return list(distance[0]),list(ids[0])
+    
+    def convert_to_dict(self,distances,ids):
+        dic = {}
+        for i in range(len(ids)):
+            dic[ids[i]] = distances[i]
+        return dic
         
-    def add_vectors(self, vectors):
-        if self.index is None:
-            self.index = self._create_index()
-        else:
-            # Reconstruct the index to free memory before adding new vectors
-            self.index.reset()
-        self.index.add(vectors)
-        
-    def reconstruct_index(self):
-        if self.index is not None:
-            self.index.reset()
-            self.index = None
-        
-    def search(self, query_vectors, k):
-        if self.index is None:
-            raise ValueError("Index has not been created yet.")
-        distances, indices = self.index.search(query_vectors, k)
-        return distances, indices
-        
-    def _create_index(self):
-        if self.index_type == 'Flat':
-            index = faiss.IndexFlat(self.dim, self.metric_type)
-        elif self.index_type == 'IVF':
-            index =  faiss.IndexFlat(self.dim, self.metric_type)
-              
-        elif self.index_type == 'PCA':
-            pca_matrix = faiss.PCAMatrix(self.dim, 10)
-            index = faiss.IndexPreTransform(pca_matrix, self._create_index())
-        elif self.index_type == 'LSH':
-            index = faiss.IndexLSH(self.dim, 8)
-        else:
-            raise ValueError(f"Unknown index type: {self.index_type}")
-        return index
