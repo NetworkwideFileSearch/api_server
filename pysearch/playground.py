@@ -45,19 +45,18 @@ class search_ops:
         except:
             raise KeyError("failure : adding id,vector pairs as dictionary failed")
         
-    def add_dict(self,*id_vec_pairs):
+    def add_dict(self,id_vec_pair):
         try:
-            for id,vec in id_vec_pairs:
-                self.doc_encoding_iter[id] = vec
+            id,vec  = id_vec_pair
+            self.doc_encoding_iter[id] = vec
             return "success"
         except:
             return False
             
 
-    def delete_dict(self,*id_list):
+    def delete_dict(self,id):
         try:
-            for id in id_list:
-                del self.doc_encoding_iter[id]
+            del self.doc_encoding_iter[id]
             return "success"
         except:
             return False

@@ -261,32 +261,34 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     return mod_files
 
 
-@app.get("/delete/{file_ids}")
-def delete_row(file_ids: str):
-    # op = essentials.db_obj.delete_vector(
-    #     file_id=int(file_id), table_name="files")
-    file_ids = [int(i) for i in file_ids.split("_")]
-    op = essentials.search_obj.delete_dict(*file_ids)
-    if not op:
-        return {'message': f"file data with file_id : {file_ids} deleted successfully"}
+@app.get("/delete/{id}")
+def delete_row(id:int):   
+    op = essentials.search_obj.delete_dict(id)
+    if op:
+        return {'message': f"file data with file_id : {id} deleted successfully"}
     else:
         return {"message": f"file data  deletion unsuccessful"}
 
 
-@app.get("/add_vector/{id_list}")
-async def add_vector(id_list: int):
-    # file_ids = [int(i) for i in file_ids.split("_")]
+@app.get("/add_vector/{id}")
+async def add_vector(id: int):
     rows = essentials.db_obj.fetch_metadata_of_specific_ids(
-        file_ids=[id_list], table_name="files")
+        file_ids=[id], table_name="files")
 
     data = essentials.db_obj.get_id_vector_pairs_to_add_in_table(
-        rows=rows, encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+                                                                    rows=rows, 
+                                                                    encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
 
-    data = list(data)
-    essentials.db_obj.add_multiple_vectors(data=data, table_name="embeddings")
-    op = essentials.search_obj.add_dict(*data)
-    if not op:
-        return {'message': f"file data and vectors with file_ids : {id_list} added successfully"}
+    essentials.db_obj.add_multiple_vectors(data=data, 
+                                           table_name="embeddings")
+
+    add_data =  essentials.db_obj.fetch_single_id_and_vector(file_id = id,
+                                                             table_name = "embeddings")
+    
+    op = essentials.search_obj.add_dict(add_data)
+    
+    if op:
+        return {'message': f"file data and vectors with file_ids : {id} added successfully"}
     else:
         return {"message": f"file data and vector addition unsuccessful"}
 

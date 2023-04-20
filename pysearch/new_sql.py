@@ -92,6 +92,21 @@ class embeddings_table(sql_ops):
 
     def load_vector_normal_form(self, obj):
         return json.loads(obj)
+    
+    def fetch_single_id_and_vector(self,file_id, table_name="embeddings"):
+        try:
+            conn = self.create_connection()
+            query = f"select file_id,vectors from {table_name} where file_id = {str(file_id)}"
+            rows = self.execute_query(conn, query)
+            if rows:
+                row = rows[0]
+                return (row[0], self.load_vector_normal_form(row[-1]))
+            else:
+                raise KeyError("file id not found in database table embeddings")
+
+        except sqlite3.Error as e:
+            print(e)
+        return None
 
     def fetch_id_and_vector(self, table_name="embeddings"):
         try:
