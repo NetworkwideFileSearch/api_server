@@ -130,6 +130,7 @@ public class WatchDir {
                 } else if (event.kind() == ENTRY_DELETE) {
                     try {
                         deleteFileFromDB(child);
+
                     } catch (Exception e) {
                         // TODO: handle exception
                         e.printStackTrace();
@@ -165,6 +166,29 @@ public class WatchDir {
     static void addVectorToDB(int myInteger) {
         try {
             URL url = new URL("http://localhost:6969/add_vector/" + myInteger);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+            reader.close();
+
+            System.out.println(response.toString());
+            conn.disconnect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void deleteVectorFromModel(int myInteger) {
+        try {
+            URL url = new URL("http://localhost:6969/delete/" + myInteger);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json");
@@ -228,14 +252,32 @@ public class WatchDir {
     static void deleteFileFromDB(Path path) throws SQLException {
         connection = DriverManager.getConnection("jdbc:sqlite:sample.db");
         Statement stmte = connection.createStatement();
+
+        String selectSql = "SELECT id FROM files WHERE location=?";
+        PreparedStatement selectStmt = connection.prepareStatement(selectSql);
+        selectStmt.setString(1, path.toString());
+
         stmte.execute(
                 "PRAGMA foreign_keys=ON");
-        String sql = "DELETE FROM files WHERE location=?";
-        PreparedStatement stmt = connection.prepareStatement(sql);
-        stmt.setString(1, path.toString());
 
-        stmt.executeUpdate();
-        stmt.close();
+        String deleteSql = "DELETE FROM files WHERE id=?";
+        PreparedStatement deleteStmt = connection.prepareStatement(deleteSql);
+
+        ResultSet rs = selectStmt.executeQuery();
+
+        while (rs.next()) {
+            int id = rs.getInt("id");
+
+            // Set the parameter for the DELETE statement
+            deleteStmt.setInt(1, id);
+
+            // Execute the DELETE statement
+            int numDeleted = deleteStmt.executeUpdate();
+
+            if (numDeleted > 0) {
+                deleteVectorFromModel(id);
+            }
+        }
     }
 
     static void usage() {
@@ -315,7 +357,7 @@ public class WatchDir {
         // }
 
         // register directory and process its events
-        Path dir = Paths.get("D:\\Projects\\BE Project\\api_server\\FolderSync\\bin\\test");
+        Path dir = Paths.get("C:\\Users\\sksou\\OneDrive\\Documents\\BEPRoject\\api_server\\FolderSync\\bin\\test");
         scanDirectory(dir);
         new WatchDir(dir, recursive).processEvents();
     }
