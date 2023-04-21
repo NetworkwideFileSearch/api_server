@@ -132,8 +132,9 @@ app.add_middleware(
 # /search - search query for the file name
 # /rediscover - again check for devices in the network
 
-def vectorize_whole_index(encoding_func):
-    essentials.db_obj.create_embeddings_table()
+def vectorize_whole_index(encoding_func = essentials.model_obj.encode_from_official_doc_by_HF):
+    
+     
     rows = essentials.db_obj.get_file_metadata_for_vectorization()
     # print(rows[0])
     for row in rows:
@@ -150,12 +151,16 @@ def search(query ):
     return essentials.index_obj.convert_to_dict(distances= res[0],ids=res[1])
 
 def add_to_index(id,encoding_func):
-    rows = essentials.db_obj.fetch_metadata_of_specific_ids(
-        file_ids=[id], table_name="files")
-    for row in rows:
-        content = make_file_content(row[1:])
-        vector = encoding_func(content)
-        essentials.index_obj.add_single_vector(vector=vector,id = row[0])
+    try:
+        rows = essentials.db_obj.fetch_metadata_of_specific_ids(
+            file_ids=[id], table_name="files")
+        for row in rows:
+            content = make_file_content(row[1:])
+            vector = encoding_func(content)
+            essentials.index_obj.add_single_vector(vector=vector,id = row[0])
+        return "success"
+    except:
+        return ""
 
 def delete_in_index(id):
     op = essentials.index_obj.remove_data(id_list=[id])
@@ -190,7 +195,7 @@ async def startup_event():
         essentials.db_obj = embeddings_table("sample.db")
         essentials.search_obj = search_ops(k=5)
         essentials.index_obj = faiss_index(dim = 384,index_name="test_index")
-        vectorize_whole_table()
+        vectorize_whole_index()
         return "Objects loaded successfully."
     except:
         return "Failed to load objects."
@@ -211,11 +216,7 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    top_k_dict = essentials.search_obj.get_top_k_docs(query,
-                                                      fetch_func=essentials.db_obj.fetch_id_and_vector,
-                                                      k=10,
-                                                      similarity_func=jaccard_sim,
-                                                      encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+    top_k_dict =  search(query=query)
     # the top_k variable is already sorted and of format list of dictionaries
 
     lis = list(top_k_dict.keys())
@@ -273,11 +274,7 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    top_k_dict = essentials.search_obj.get_top_k_docs(query,
-                                                      fetch_func=essentials.db_obj.fetch_id_and_vector,
-                                                      k=10,
-                                                      similarity_func=cosine_sim,
-                                                      encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+    top_k_dict =  search(query=query)
     # the top_k variable is already sorted and of format list of dictionaries
 
     lis = list(top_k_dict.keys())
@@ -297,7 +294,7 @@ async def search_func(query: str, db: Session = Depends(get_db)):
 
 @app.get("/delete/{id}")
 def delete_row(id:int):   
-    op = essentials.search_obj.delete_dict(id)
+    op =  delete_in_index(id=id)
     if op:
         return {'message': f"file data with file_id : {id} deleted successfully"}
     else:
@@ -306,20 +303,7 @@ def delete_row(id:int):
 
 @app.get("/add_vector/{id}")
 async def add_vector(id: int):
-    rows = essentials.db_obj.fetch_metadata_of_specific_ids(
-        file_ids=[id], table_name="files")
-
-    data = essentials.db_obj.get_id_vector_pairs_to_add_in_table(
-                                                                    rows=rows, 
-                                                                    encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
-
-    essentials.db_obj.add_multiple_vectors(data=data, 
-                                           table_name="embeddings")
-
-    add_data =  essentials.db_obj.fetch_single_id_and_vector(file_id = id,
-                                                             table_name = "embeddings")
-    
-    op = essentials.search_obj.add_dict(add_data)
+    op = add_to_index(id = id,encoding_func = essentials.model_obj.encode_from_official_doc_by_HF)
     
     if op:
         return {'message': f"file data and vectors with file_ids : {id} added successfully"}
