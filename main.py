@@ -12,7 +12,11 @@ from database import SessionLocal, engine
 from pysearch.new_sql import embeddings_table
 from pysearch.work_with_model import transformer_ops
 from pysearch.playground import search_ops, jaccard_sim, cosine_sim
-from pysearch.common_methods import *
+from pysearch.common_methods import * 
+from pysearch.faiss_index import faiss_index
+ 
+
+
 
 import uvicorn
 from dataclasses import dataclass
@@ -110,10 +114,10 @@ class ObjClass:
     model_obj: object = None
     db_obj: object = None
     search_obj: object = None
+    index_obj : object = None
 
 
 essentials = ObjClass()
-
 
 app = FastAPI()
 
@@ -127,6 +131,35 @@ app.add_middleware(
 
 # /search - search query for the file name
 # /rediscover - again check for devices in the network
+
+def vectorize_whole_index(encoding_func):
+    essentials.db_obj.create_embeddings_table()
+    rows = essentials.db_obj.get_file_metadata_for_vectorization()
+    # print(rows[0])
+    for row in rows:
+        content = make_file_content(row[1:])
+        vector = encoding_func(content)
+        essentials.index_obj.add_single_vector(vector=vector,id = row[0])
+     
+    return {"message": "entire table is vectorized and stored in table"}
+
+
+def search(query ):
+    query_vec = essentials.model_obj.encode_from_official_doc_by_HF(query)
+    res = essentials.index_obj.search_top_k(query_vector=query_vec,k = 10,do_normalize=1)
+    return essentials.index_obj.convert_to_dict(distances= res[0],ids=res[1])
+
+def add_to_index(id,encoding_func):
+    rows = essentials.db_obj.fetch_metadata_of_specific_ids(
+        file_ids=[id], table_name="files")
+    for row in rows:
+        content = make_file_content(row[1:])
+        vector = encoding_func(content)
+        essentials.index_obj.add_single_vector(vector=vector,id = row[0])
+
+def delete_in_index(id):
+    op = essentials.index_obj.remove_data(id_list=[id])
+    return op
 
 
 def vectorize_whole_table():
@@ -156,6 +189,7 @@ async def startup_event():
         essentials.model_obj.load_model_pickle()
         essentials.db_obj = embeddings_table("sample.db")
         essentials.search_obj = search_ops(k=5)
+        essentials.index_obj = faiss_index(dim = 384,index_name="test_index")
         vectorize_whole_table()
         return "Objects loaded successfully."
     except:

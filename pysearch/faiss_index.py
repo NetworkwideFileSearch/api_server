@@ -57,8 +57,13 @@ class faiss_index:
 
 
     def remove_data(self,id_list):
-        id_list = np.array(id_list)
-        self.index.remove_ids(id_list)
+        try:
+            id_list = np.array(id_list)
+            self.index.remove_ids(id_list)
+            return "success"
+        except:
+            return ""
+
 
     def search_top_k(self,query_vector,k = 5,do_normalize = 1):
         if do_normalize:
