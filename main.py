@@ -60,7 +60,7 @@ ip_address = socket.gethostbyname(hostname)
 
 # Initialize nmap with path to binary
 s_path = [r'.\Nmap\nmap.exe']
-nm = nmap.PortScanner(nmap_search_path=s_path)
+# nm = nmap.PortScanner(nmap_search_path=s_path)
 
 # cache all hosts list
 nw_hosts = []
@@ -79,22 +79,23 @@ def get_db():
 
 
 def get_all_ips():
-    ip = ip_address.split('.')
-    ip[-1] = '0'
-    ipAddr = '.'.join(ip)
-    nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
-    res = {}
-    hostNames = []
-    for host in nm.all_hosts():
-        info = {'ip':host}
-        if 'hostnames' in nm[host]:
-            info['hostnames'] = nm[host]['hostnames'][0]['name']
-        else:
-            info['hostnames'] = 'Unknown'
-        hostNames.append(info)
-    return hostNames
+    # ip = ip_address.split('.')
+    # ip[-1] = '0'
+    # ipAddr = '.'.join(ip)
+    # nm.scan(hosts=f"{ipAddr}/24", arguments='-sn')
+    # res = {}
+    # hostNames = []
+    # for host in nm.all_hosts():
+    #     info = {'ip':host}
+    #     if 'hostnames' in nm[host]:
+    #         info['hostnames'] = nm[host]['hostnames'][0]['name']
+    #     else:
+    #         info['hostnames'] = 'Unknown'
+    #     hostNames.append(info)
+    # return hostNames
     # hosts = scan_network(ip_address, "24")
     # return hosts
+    return []
 
 
 @dataclass
@@ -132,9 +133,9 @@ app.add_middleware(
 # /search - search query for the file name
 # /rediscover - again check for devices in the network
 
-def vectorize_whole_index(encoding_func = essentials.model_obj.encode_from_official_doc_by_HF):
+def vectorize_whole_index():
     
-     
+    encoding_func = essentials.model_obj.encode_from_official_doc_by_HF
     rows = essentials.db_obj.get_file_metadata_for_vectorization()
     # print(rows[0])
     for row in rows:
@@ -148,7 +149,8 @@ def vectorize_whole_index(encoding_func = essentials.model_obj.encode_from_offic
 def search(query ):
     query_vec = essentials.model_obj.encode_from_official_doc_by_HF(query)
     res = essentials.index_obj.search_top_k(query_vector=query_vec,k = 10,do_normalize=1)
-    return essentials.index_obj.convert_to_dict(distances= res[0],ids=res[1])
+    output = essentials.index_obj.convert_to_dict(distances= res[0],ids=res[1])
+    return output
 
 def add_to_index(id,encoding_func):
     try:
