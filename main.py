@@ -150,6 +150,7 @@ def search(query ):
     query_vec = essentials.model_obj.encode_from_official_doc_by_HF(query)
     res = essentials.index_obj.search_top_k(query_vector=query_vec,k = 10,do_normalize=1)
     output = essentials.index_obj.convert_to_dict(distances= res[0],ids=res[1])
+    print(output)
     return output
 
 def add_to_index(id,encoding_func):
@@ -225,6 +226,7 @@ async def search_func(query: str, db: Session = Depends(get_db)):
 
     files = db.query(File).filter(File.id.in_(lis)).all()
     files.sort(key=lambda row: lis.index(row.id))
+    print(files)
 
     api_output_dict = {}
 
@@ -236,6 +238,7 @@ async def search_func(query: str, db: Session = Depends(get_db)):
         mod_files.append(file_dict)
 
     api_output_dict[ip_address] = mod_files
+    print(api_output_dict)
 
     # Define a function to make the API call and store the output in the dictionary
     def make_api_call(ip):
