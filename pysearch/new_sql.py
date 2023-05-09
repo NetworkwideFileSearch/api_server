@@ -153,7 +153,18 @@ class embeddings_table(sql_ops):
         res = self.execute_query(conn, query, file_ids)
         conn.commit()
         conn.close()
-        return iter(res)
+        return res
+    
+    def fetch_metadata_of_ids(self, file_ids, table_name="files", column_name="id"):
+        conn = self.create_connection()
+        for id in file_ids:
+            query = "SELECT * FROM {} WHERE {} = {};".format(table_name,column_name,str(id))
+            res = self.execute_query(conn, query)
+            # print(res)
+            yield res
+        conn.commit()
+        conn.close()
+        
 
     def keyword_search(self, query, table_name="files", column_name="file_name"):
         conn = self.create_connection()

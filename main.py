@@ -150,7 +150,7 @@ def search(query ):
     query_vec = essentials.model_obj.encode_from_official_doc_by_HF(query)
     res = essentials.index_obj.search_top_k(query_vector=query_vec,k = 10,do_normalize=1)
     output = essentials.index_obj.convert_to_dict(distances= res[0],ids=res[1])
-    print(output)
+    # print(output)
     return output
 
 def add_to_index(id,encoding_func):
@@ -204,6 +204,8 @@ async def startup_event():
         return "Failed to load objects."
 
 
+
+
 @app.get("/search/{query}")
 async def search_func(query: str, db: Session = Depends(get_db)):
     """
@@ -219,14 +221,13 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    top_k_dict =  search(query=query)
+    top_k_dict =  search(query = query)
     # the top_k variable is already sorted and of format list of dictionaries
 
     lis = list(top_k_dict.keys())
-
+    print(lis)
     files = db.query(File).filter(File.id.in_(lis)).all()
     files.sort(key=lambda row: lis.index(row.id))
-    print(files)
 
     api_output_dict = {}
 
@@ -238,7 +239,6 @@ async def search_func(query: str, db: Session = Depends(get_db)):
         mod_files.append(file_dict)
 
     api_output_dict[ip_address] = mod_files
-    print(api_output_dict)
 
     # Define a function to make the API call and store the output in the dictionary
     def make_api_call(ip):
@@ -279,7 +279,11 @@ async def search_func(query: str, db: Session = Depends(get_db)):
     list
         A list of file ids in decreasing order of relevance
     """
-    top_k_dict =  search(query=query)
+    top_k_dict = essentials.search_obj.get_top_k_docs(query,
+                                                      fetch_func=essentials.db_obj.fetch_id_and_vector,
+                                                      k=10,
+                                                      similarity_func=cosine_sim,
+                                                      encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
     # the top_k variable is already sorted and of format list of dictionaries
 
     lis = list(top_k_dict.keys())
@@ -299,7 +303,7 @@ async def search_func(query: str, db: Session = Depends(get_db)):
 
 @app.get("/delete/{id}")
 def delete_row(id:int):   
-    op =  delete_in_index(id=id)
+    op = essentials.search_obj.delete_dict(id)
     if op:
         return {'message': f"file data with file_id : {id} deleted successfully"}
     else:
@@ -308,7 +312,20 @@ def delete_row(id:int):
 
 @app.get("/add_vector/{id}")
 async def add_vector(id: int):
-    op = add_to_index(id = id,encoding_func = essentials.model_obj.encode_from_official_doc_by_HF)
+    rows = essentials.db_obj.fetch_metadata_of_specific_ids(
+        file_ids=[id], table_name="files")
+
+    data = essentials.db_obj.get_id_vector_pairs_to_add_in_table(
+                                                                    rows=rows, 
+                                                                    encoding_func=essentials.model_obj.encode_from_official_doc_by_HF)
+
+    essentials.db_obj.add_multiple_vectors(data=data, 
+                                           table_name="embeddings")
+
+    add_data =  essentials.db_obj.fetch_single_id_and_vector(file_id = id,
+                                                             table_name = "embeddings")
+    
+    op = essentials.search_obj.add_dict(add_data)
     
     if op:
         return {'message': f"file data and vectors with file_ids : {id} added successfully"}
